@@ -88,8 +88,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 /* ============ CONFIG: paste your values from Supabase > Project Settings > API ============ */
-const SUPABASE_URL = "https://yqylyqmqugnjacdtpxdb.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_kmmptkC7uSQGtPj6ItEDmg_vYdogOkr";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 /* ======================================================================================== */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -268,8 +268,17 @@ $("resetBtn").onclick = async () => {
 
 /* ---------- START ---------- */
 (async function start(){
+  if(SUPABASE_URL.includes("YOUR-PROJECT-REF") || SUPABASE_ANON_KEY.includes("YOUR-ANON")){
+    $("pickList").innerHTML = `<div class="empty"><b>Setup needed:</b> the Supabase URL and key in index.html have not been filled in.</div>`; return;
+  }
   const cat = await sb.from("catalogue").select("*").order("id");
+  if(cat.error){
+    $("pickList").innerHTML = `<div class="empty"><b>Couldn't load the list.</b><br>${esc(cat.error.message)}<br><small>Check the URL and key in index.html, and that setup.sql was run.</small></div>`; return;
+  }
   catalogue = cat.data || [];
+  if(!catalogue.length){
+    $("pickList").innerHTML = `<div class="empty"><b>The list is empty.</b><br>Connected to Supabase, but the catalogue table has no rows (or the read permission is missing). Re-run setup.sql.</div>`; return;
+  }
   catalogue.forEach(c => { if(!categories.includes(c.category)) categories.push(c.category); });
   const sp = savedPin();
   if(sp){ const { data } = await sb.rpc("check_owner_pin", { p_pin: sp }); if(data) pin = sp; else storePin(null); }
