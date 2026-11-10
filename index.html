@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grocery List</title>
+<meta name="theme-color" content="#1f6f4a">
+<style>
+  :root{--bg:#f6f7f5;--card:#fff;--text:#1d2420;--muted:#66706a;--accent:#1f6f4a;--accent-text:#fff;--line:#dde2de;--danger:#b3261e;--soft:#e8f2ec}
+  @media (prefers-color-scheme:dark){:root{--bg:#121513;--card:#1b201d;--text:#e8ece9;--muted:#98a39c;--accent:#3fa874;--accent-text:#08150e;--line:#2b332e;--danger:#f2877f;--soft:#1f2b24}}
+  *{box-sizing:border-box}
+  body{margin:0;font:17px/1.35 -apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);padding-bottom:84px}
+  header{position:sticky;top:0;height:50px;background:var(--accent);color:var(--accent-text);padding:0 14px;display:flex;justify-content:space-between;align-items:center;z-index:10}
+  header h1{font-size:18px;margin:0}
+  button{font:inherit;border:0;border-radius:10px;padding:10px 16px;cursor:pointer;background:var(--accent);color:var(--accent-text);font-weight:700}
+  button.secondary{background:var(--soft);color:var(--text)}
+  button.danger{background:var(--danger);color:#fff}
+  button.link{background:none;color:inherit;padding:4px 0;font-weight:400;text-decoration:underline;font-size:14px}
+  header button.link{color:var(--accent-text);padding:4px 8px}
+  button:disabled{opacity:.5}
+  .full{width:100%}
+  main{max-width:680px;margin:0 auto}
+  .filters{position:sticky;top:50px;background:var(--bg);z-index:9;padding:10px 12px 8px;border-bottom:1px solid var(--line)}
+  .filters input{width:100%;padding:12px;font-size:17px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text)}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:500;font-size:15px}
+  .chip.on{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+  .list{padding:4px 12px}
+  .cat{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:18px 2px 6px;display:flex;justify-content:space-between;align-items:center}
+  .p{display:flex;gap:10px;align-items:center;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:6px}
+  .p.in{background:var(--soft);border-color:var(--accent)}
+  .p .body{flex:1;min-width:0}
+  .name{font-weight:600}
+  .addbtn{min-width:104px}
+  .addbtn:disabled{opacity:1;color:var(--accent)}
+  .step{display:flex;align-items:center;gap:6px}
+  .step button{width:42px;padding:10px 0;background:var(--card);color:var(--text);border:1px solid var(--line);font-size:18px}
+  .step span{min-width:28px;text-align:center;font-weight:700}
+  .empty{text-align:center;color:var(--muted);padding:30px 10px}
+  .tip{font-size:14px;color:var(--muted);padding:10px 2px 0}
+  .tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);z-index:10}
+  .tabs button{flex:1;border-radius:0;background:none;color:var(--muted);padding:16px}
+  .tabs button.active{color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
+  .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:8px 8px 8px 16px;border-radius:999px;font-size:15px;z-index:20;max-width:92%;display:flex;gap:10px;align-items:center}
+  .toast.err{background:var(--danger);color:#fff;padding:10px 16px}
+  .toast .undo{background:var(--accent);color:var(--accent-text);padding:6px 14px;border-radius:999px}
+  .summary{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+  .sumtop{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .sumbtns{display:flex;gap:8px}
+  .sumbtns button{padding:8px 12px;font-size:15px}
+  .bar{height:8px;background:var(--soft);border-radius:99px;margin-top:10px;overflow:hidden}
+  .bar div{height:100%;background:var(--accent);border-radius:99px;transition:width .3s}
+  .item{display:flex;gap:10px;align-items:flex-start;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:6px}
+  .item.done{opacity:.65}
+  .item.done .name{text-decoration:line-through}
+  .item input[type=checkbox]{width:24px;height:24px;margin-top:2px;accent-color:var(--accent);flex:0 0 auto}
+  .item .body{flex:1;min-width:0}
+  .noteline{font-size:14px;color:var(--muted);margin-top:2px;cursor:pointer}
+  .qtybadge{background:var(--soft);border-radius:8px;padding:2px 8px;font-weight:700}
+  .notepanel{margin-top:8px;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+  .nchips{display:flex;flex-wrap:wrap;gap:6px}
+  .nchip{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14px;font-weight:500}
+  .nchip.on{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+  .noterow{display:flex;gap:8px;margin-top:8px}
+  .noterow input{flex:1;min-width:0;padding:10px;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text)}
+  .noterow button{padding:8px 14px}
+  .count{font-size:12px;color:var(--muted);text-align:right;margin-top:2px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛒 Grocery List</h1>
+  <div><small id="modeText">Helper</small> <button class="link" id="ownerBtn">Owner</button></div>
+</header>
+
+<main>
+  <section id="viewPick">
+    <div class="filters">
+      <input type="search" id="search" placeholder="Search items…" autocomplete="off">
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="list" id="pickList"></div>
+  </section>
+
+  <section id="viewCart" class="hidden">
+    <div class="list" id="cartBody"></div>
+    <div id="ownerBar" class="list hidden" style="margin-top:14px">
+      <button class="danger full" id="resetBtn">Reset cart (archive all)</button>
+      <p class="tip">Tick items as you buy them. Reset archives everything and starts a fresh list; it stays available under “Bought before”.</p>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button id="tabPick" class="active">＋ Pick items</button>
+  <button id="tabCart">🛒 Cart <span id="cartCount"></span></button>
+</nav>
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ============ CONFIG: paste your values from Supabase > Project Settings > API ============ */
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
+/* ======================================================================================== */
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const catLabel = c => (c || "Other").replace(/ \(outside.*\)$/, "");
+const NOTE_CHIPS = ["Any brand", "Cheapest", "Bigger pack", "Organic", "Urgent"];
+
+let role = "helper", pin = null, catalogue = [], categories = [], cart = [], history = [];
+let activeCat = "All", openNote = null, showBought = true;
+
+/* ---------- TOAST (with optional Undo) ---------- */
+function toast(text, isErr, undo){
+  const t = $("toast");
+  t.className = "toast" + (isErr ? " err" : "");
+  t.innerHTML = `<span>${esc(text)}</span>` + (undo ? `<button class="undo" id="undoBtn">Undo</button>` : "");
+  if(undo) $("undoBtn").onclick = async () => { t.classList.add("hidden"); await undo(); };
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => t.classList.add("hidden"), undo ? 6000 : isErr ? 5000 : 1800);
+}
+
+/* ---------- OWNER MODE (PIN) ---------- */
+function savedPin(){ try{ return localStorage.getItem("ownerPin"); }catch(e){ return null; } }
+function storePin(p){ try{ p ? localStorage.setItem("ownerPin", p) : localStorage.removeItem("ownerPin"); }catch(e){} }
+function applyMode(){
+  role = pin ? "owner" : "helper";
+  $("modeText").textContent = pin ? "Owner mode" : "Helper";
+  $("ownerBtn").textContent = pin ? "Exit" : "Owner";
+  renderCart();
+}
+$("ownerBtn").onclick = async () => {
+  if(pin){ pin = null; storePin(null); applyMode(); return; }
+  const p = prompt("Owner PIN:");
+  if(!p) return;
+  const { data, error } = await sb.rpc("check_owner_pin", { p_pin: p });
+  if(error || !data){ alert("Wrong PIN."); return; }
+  pin = p; storePin(p); applyMode();
+};
+
+/* ---------- TABS ---------- */
+function setView(v){
+  $("viewPick").classList.toggle("hidden", v !== "pick");
+  $("viewCart").classList.toggle("hidden", v !== "cart");
+  $("tabPick").classList.toggle("active", v === "pick");
+  $("tabCart").classList.toggle("active", v === "cart");
+  window.scrollTo(0, 0);
+  if(v === "cart") loadCart();
+}
+$("tabPick").onclick = () => setView("pick");
+$("tabCart").onclick = () => setView("cart");
+
+/* ---------- FILTER CHIPS ---------- */
+function renderChips(){
+  const all = [["All","All"], ["__freq","⭐ Frequent"], ["__hist","🕘 Bought before"], ...categories.map(c => [c, catLabel(c)])];
+  $("chips").innerHTML = all.map(([v, l]) =>
+    `<button class="chip ${v === activeCat ? "on" : ""}" data-cat="${esc(v)}">${esc(l)}</button>`).join("");
+}
+$("chips").onclick = async e => {
+  const b = e.target.closest("[data-cat]"); if(!b) return;
+  activeCat = b.dataset.cat;
+  if(activeCat === "__hist") await loadHistory();
+  renderChips(); renderPick(); window.scrollTo(0, 0);
+};
+$("search").oninput = renderPick;
+
+/* ---------- HISTORY ("Bought before") ---------- */
+async function loadHistory(){
+  const { data, error } = await sb.from("cart_items").select("name,category,qty,archived_at")
+    .eq("archived", true).order("archived_at", { ascending: false }).limit(600);
+  if(!error) history = data || [];
+}
+function historyItems(){
+  const info = {};
+  history.forEach((h, idx) => {
+    if(!info[h.name]) info[h.name] = { name: h.name, category: h.category, count: 0, first: idx };
+    info[h.name].count++;
+  });
+  return Object.values(info).sort((a, b) => b.count - a.count || a.first - b.first);
+}
+function lastShop(){
+  if(!history.length) return [];
+  const at = history[0].archived_at;
+  return history.filter(h => h.archived_at === at);
+}
+
+/* ---------- PICK LIST ---------- */
+function cartMap(){
+  const m = {};
+  cart.forEach(i => { if(!i.purchased && !(i.name in m)) m[i.name] = i; });
+  return m;
+}
+function rowHtml(c, ex, custom){
+  const label = custom ? `${esc(c.name)} <span style="color:var(--muted);font-weight:400">(new item)</span>` : esc(c.name);
+  if(ex){
+    return `<div class="p in"><div class="body"><div class="name">${label}</div></div>
+      <button class="addbtn secondary" disabled>✓ In cart${ex.qty > 1 ? " ×" + ex.qty : ""}</button></div>`;
+  }
+  return `<div class="p"><div class="body"><div class="name">${label}</div></div>
+    <button class="addbtn" data-act="add" data-name="${esc(c.name)}" data-cat="${esc(c.category || "")}">Add</button></div>`;
+}
+function renderPick(){
+  const raw = $("search").value.trim(), term = raw.toLowerCase();
+  const inCart = cartMap();
+  const catByName = {}; catalogue.forEach(c => catByName[c.name] = c.category);
+  let rows, headers = true, html = "";
+
+  if(activeCat === "__hist"){
+    headers = false;
+    rows = historyItems().map(h => ({ name: h.name, category: h.category || catByName[h.name] || null }));
+    if(!term){
+      const missing = lastShop().filter(h => !inCart[h.name]);
+      if(!history.length) html += `<div class="empty">Nothing here yet.<br>Items show up after the first cart reset.</div>`;
+      else if(missing.length) html += `<button class="full" style="margin:8px 0" data-act="addlast">Add last shop (${missing.length} item${missing.length > 1 ? "s" : ""})</button>`;
+      else html += `<div class="tip">Everything from the last shop is already in the cart.</div>`;
+    }
+  } else if(activeCat === "__freq"){
+    rows = catalogue.filter(c => c.rank_in_category <= 3);
+  } else if(activeCat === "All"){
+    rows = catalogue;
+  } else {
+    rows = catalogue.filter(c => c.category === activeCat); headers = false;
+  }
+  if(term) rows = rows.filter(c => c.name.toLowerCase().includes(term) || (c.brands || "").toLowerCase().includes(term));
+
+  if(raw && !catalogue.some(c => c.name.toLowerCase() === raw.toLowerCase())){
+    html += `<div class="cat">Not on the list?</div>` + rowHtml({ name: raw, category: null }, inCart[raw], true);
+  }
+  let last = null;
+  rows.forEach(c => {
+    if(headers && c.category !== last){ html += `<div class="cat">${esc(catLabel(c.category))}</div>`; last = c.category; }
+    html += rowHtml(c, inCart[c.name], false);
+  });
+  if(!rows.length && !raw && activeCat !== "__hist") html = `<div class="empty">No items here.</div>`;
+  $("pickList").innerHTML = html;
+}
+
+/* ---------- CART DATA ---------- */
+async function loadCart(){
+  const { data, error } = await sb.from("cart_items").select("*").eq("archived", false).order("added_at");
+  if(error) return;
+  cart = data || [];
+  $("cartCount").textContent = cart.length ? `(${cart.length})` : "";
+  const typing = document.activeElement && document.activeElement.id === "noteInput";
+  renderPick();
+  if(!typing) renderCart();
+}
+
+/* ---------- CART VIEW ---------- */
+function listText(){
+  const todo = cart.filter(i => !i.purchased);
+  if(!todo.length) return "";
+  const groups = {};
+  todo.forEach(i => (groups[i.category || "Other"] ||= []).push(i));
+  let out = `Grocery list (${todo.length} item${todo.length > 1 ? "s" : ""})\n`;
+  sortedCats(groups).forEach(cat => {
+    out += `\n${catLabel(cat)}\n`;
+    groups[cat].forEach(i => { out += `- ${i.name}${i.qty > 1 ? " x" + i.qty : ""}${i.note ? " (" + i.note + ")" : ""}\n`; });
+  });
+  return out.trim();
+}
+function sortedCats(groups){
+  return Object.keys(groups).sort((a, b) => (categories.indexOf(a) + 1 || 99) - (categories.indexOf(b) + 1 || 99));
+}
+function notePanel(i){
+  const parts = (i.note || "").split(",").map(s => s.trim());
+  return `<div class="notepanel">
+    <div class="nchips">${NOTE_CHIPS.map(c => `<button class="nchip ${parts.includes(c) ? "on" : ""}" data-act="notechip" data-id="${i.id}" data-chip="${esc(c)}">${esc(c)}</button>`).join("")}</div>
+    <div class="noterow"><input id="noteInput" type="text" maxlength="100" value="${esc(i.note || "")}" placeholder="Or type a note…"><button data-act="notesave" data-id="${i.id}">Save</button></div>
+    <div class="count"><span id="noteCount">${(i.note || "").length}</span>/100</div></div>`;
+}
+function itemHtml(i){
+  const open = openNote === i.id && !i.purchased;
+  return `<div class="item ${i.purchased ? "done" : ""}">
+    ${role === "owner" ? `<input type="checkbox" data-tick="${i.id}" ${i.purchased ? "checked" : ""}>` : ""}
+    <div class="body"><div class="name">${esc(i.name)}</div>
+      ${i.note && !open ? `<div class="noteline" data-act="notetoggle" data-id="${i.id}">📝 ${esc(i.note)}</div>` : ""}
+      ${!i.purchased ? `<button class="link" data-act="notetoggle" data-id="${i.id}">${open ? "Close note" : i.note ? "Edit note" : "+ Note"}</button>` : ""}
+      ${open ? notePanel(i) : ""}</div>
+    ${i.purchased ? `<span class="qtybadge">×${i.qty}</span>` :
+      `<div class="step"><button data-act="dec" data-id="${i.id}" aria-label="Less">${i.qty <= 1 ? "🗑" : "−"}</button><span>${i.qty}</span><button data-act="inc" data-id="${i.id}" aria-label="More">+</button></div>`}
+  </div>`;
+}
+function renderCart(){
+  const body = $("cartBody");
+  $("ownerBar").classList.toggle("hidden", !(role === "owner" && cart.length));
+  if(!cart.length){ body.innerHTML = `<div class="empty">The cart is empty.<br>Go to “Pick items” to add some.</div>`; return; }
+  const todo = cart.filter(i => !i.purchased), done = cart.filter(i => i.purchased);
+  const pct = Math.round(done.length / cart.length * 100);
+  let html = `<div class="summary"><div class="sumtop"><b>${done.length} of ${cart.length} bought</b>
+    <div class="sumbtns"><button class="secondary" data-act="copy">Copy list</button>${navigator.share ? `<button class="secondary" data-act="share">Share</button>` : ""}</div></div>
+    <div class="bar"><div style="width:${pct}%"></div></div></div>`;
+  const groups = {};
+  todo.forEach(i => (groups[i.category || "Other"] ||= []).push(i));
+  sortedCats(groups).forEach(cat => { html += `<div class="cat">${esc(catLabel(cat))}</div>` + groups[cat].map(itemHtml).join(""); });
+  if(!todo.length) html += `<div class="empty">Everything is bought 🎉</div>`;
+  if(done.length){
+    html += `<div class="cat"><span>Bought (${done.length})</span><button class="link" data-act="togglebought">${showBought ? "Hide" : "Show"}</button></div>`;
+    if(showBought) html += done.map(itemHtml).join("");
+  }
+  body.innerHTML = html;
+  body.querySelectorAll("[data-tick]").forEach(cb => cb.onchange = async () => {
+    const { error } = await sb.rpc("owner_set_purchased", { p_pin: pin, p_id: Number(cb.dataset.tick), p_value: cb.checked });
+    if(error) toast(error.message, true);
+    loadCart();
+  });
+  const ni = $("noteInput");
+  if(ni) ni.oninput = () => { $("noteCount").textContent = ni.value.length; };
+}
+$("cartBody").addEventListener("keydown", e => {
+  if(e.key === "Enter" && e.target.id === "noteInput"){ e.preventDefault(); const b = document.querySelector('[data-act="notesave"]'); if(b) b.click(); }
+});
+
+/* ---------- ACTIONS ---------- */
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); return true; }
+  catch(e){
+    const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select();
+    let ok = false; try{ ok = document.execCommand("copy"); }catch(_){} ta.remove(); return ok;
+  }
+}
+async function removeRow(row){
+  const { error } = await sb.from("cart_items").delete().eq("id", row.id);
+  if(error){ toast(error.message, true); return; }
+  toast(`Removed ${row.name}`, false, async () => {
+    await sb.from("cart_items").insert({ name: row.name, category: row.category, qty: row.qty, note: row.note });
+    loadCart();
+  });
+}
+async function act(e){
+  const b = e.target.closest("[data-act]"); if(!b || b.disabled) return;
+  const a = b.dataset.act, id = Number(b.dataset.id);
+  const row = cart.find(i => i.id === id);
+
+  // actions that don't touch the database
+  if(a === "notetoggle"){ openNote = openNote === id ? null : id; renderCart(); return; }
+  if(a === "togglebought"){ showBought = !showBought; renderCart(); return; }
+  if(a === "copy"){ const t = listText(); if(!t){ toast("Nothing left to buy"); return; } toast(await copyText(t) ? "List copied" : "Couldn't copy", false); return; }
+  if(a === "share"){ const t = listText(); if(!t){ toast("Nothing left to buy"); return; } try{ await navigator.share({ text: t }); }catch(_){} return; }
+
+  b.disabled = true;
+  let error = null;
+  if(a === "add"){
+    const name = b.dataset.name;
+    const r = await sb.from("cart_items").insert({ name, category: b.dataset.cat || null, qty: 1 }).select("id").single();
+    error = r.error;
+    if(!error){
+      const newId = r.data.id;
+      if($("search").value && !catalogue.some(c => c.name === name)) $("search").value = "";
+      toast("Added " + name, false, async () => { await sb.from("cart_items").delete().eq("id", newId); loadCart(); });
+    }
+  } else if(a === "addlast"){
+    const inCart = cartMap();
+    const rows = lastShop().filter(h => !inCart[h.name]).map(h => ({ name: h.name, category: h.category, qty: h.qty || 1 }));
+    const r = await sb.from("cart_items").insert(rows).select("id");
+    error = r.error;
+    if(!error){
+      const ids = r.data.map(x => x.id);
+      toast(`Added ${ids.length} items`, false, async () => { await sb.from("cart_items").delete().in("id", ids); loadCart(); });
+    }
+  } else if(a === "inc" && row){
+    ({ error } = await sb.from("cart_items").update({ qty: Math.min(99, row.qty + 1) }).eq("id", id));
+  } else if(a === "dec" && row){
+    if(row.qty <= 1){ await removeRow(row); await loadCart(); return; }
+    ({ error } = await sb.from("cart_items").update({ qty: row.qty - 1 }).eq("id", id));
+  } else if((a === "notechip" || a === "notesave") && row){
+    const inp = $("noteInput"); let val = inp ? inp.value : (row.note || "");
+    if(a === "notechip"){
+      const parts = val.split(",").map(s => s.trim()).filter(Boolean), chip = b.dataset.chip, idx = parts.indexOf(chip);
+      if(idx >= 0) parts.splice(idx, 1); else parts.push(chip);
+      val = parts.join(", ");
+    }
+    val = val.trim().slice(0, 100);
+    ({ error } = await sb.from("cart_items").update({ note: val || null }).eq("id", id));
+    if(a === "notesave") openNote = null;
+  }
+  if(error) toast(error.message, true);
+  await loadCart();
+}
+$("pickList").onclick = act;
+$("cartBody").onclick = act;
+
+$("resetBtn").onclick = async () => {
+  const left = cart.filter(i => !i.purchased).length;
+  const msg = left ? `${left} item(s) are not ticked off. Archive everything and reset the cart anyway?` : "Archive all items and reset the cart?";
+  if(!confirm(msg)) return;
+  const { data, error } = await sb.rpc("owner_reset_cart", { p_pin: pin });
+  if(error){ toast(error.message, true); return; }
+  openNote = null;
+  toast(`Cart reset: ${data ?? ""} item${data === 1 ? "" : "s"} archived`);
+  await loadHistory();
+  loadCart();
+};
+
+/* ---------- START ---------- */
+(async function start(){
+  if(SUPABASE_URL.includes("YOUR-PROJECT-REF") || SUPABASE_ANON_KEY.includes("YOUR-ANON")){
+    $("pickList").innerHTML = `<div class="empty"><b>Setup needed:</b> the Supabase URL and key in index.html have not been filled in.</div>`; return;
+  }
+  const cat = await sb.from("catalogue").select("*").order("id");
+  if(cat.error){
+    $("pickList").innerHTML = `<div class="empty"><b>Couldn't load the list.</b><br>${esc(cat.error.message)}<br><small>Check the URL and key in index.html, and that setup.sql was run.</small></div>`; return;
+  }
+  catalogue = cat.data || [];
+  if(!catalogue.length){
+    $("pickList").innerHTML = `<div class="empty"><b>The list is empty.</b><br>Connected to Supabase, but the catalogue table has no rows (or the read permission is missing). Re-run setup.sql.</div>`; return;
+  }
+  catalogue.forEach(c => { if(!categories.includes(c.category)) categories.push(c.category); });
+  const sp = savedPin();
+  if(sp){ const { data } = await sb.rpc("check_owner_pin", { p_pin: sp }); if(data) pin = sp; else storePin(null); }
+  await loadHistory();
+  renderChips();
+  applyMode();
+  await loadCart();
+  setInterval(loadCart, 30000);
+  document.addEventListener("visibilitychange", () => { if(!document.hidden) loadCart(); });
+})();
+</script>
+</body>
+</html>
