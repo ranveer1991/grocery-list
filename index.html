@@ -120,27 +120,16 @@
       <p class="tip">Tick items as you buy them. Reset clears only the ticked items; anything not ticked stays in the cart for next time.</p>
     </div>
   </section>
+
+  <section id="viewFam" class="hidden"><div class="list" id="famBody"></div></section>
 </main>
 
 <nav class="tabs hidden" id="appNav">
   <button id="tabPick" class="active">＋ Pick items</button>
   <button id="tabCart">🛒 Cart <span id="cartCount"></span></button>
+  <button id="tabFam">👪 Family</button>
 </nav>
 <div id="toast" class="toast hidden"></div>
-
-<div id="menuModal" class="modal hidden">
-  <div class="sheet">
-    <h2 id="mName"></h2>
-    <div class="hint" id="mWho"></div>
-    <div id="mInvite">
-      <label>Invite code for your helper or family</label>
-      <div style="font-size:26px;font-weight:700;letter-spacing:.08em" id="mCode"></div>
-      <div class="hint">They sign in, choose “Join an existing one” and type this code.</div>
-      <button class="secondary full" id="mCopy" style="margin-top:10px">Copy invite message</button>
-    </div>
-    <div class="btns"><button class="secondary" id="mClose">Close</button><button class="danger" id="mOut">Sign out</button></div>
-  </div>
-</div>
 
 <div id="newModal" class="modal hidden">
   <div class="sheet">
@@ -164,8 +153,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 /* ============ CONFIG: paste your values from Supabase > Project Settings > API ============ */
-const SUPABASE_URL = "https://yqylyqmqugnjacdtpxdb.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_kmmptkC7uSQGtPj6ItEDmg_vYdogOkr";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 /* ======================================================================================== */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -217,32 +206,80 @@ $("famJoin").onclick = async () => {
   boot();
 };
 const signOut = async () => { await sb.auth.signOut(); location.reload(); };
-$("onOut").onclick = signOut; $("mOut").onclick = signOut;
-$("ownerBtn").onclick = () => {
-  $("mName").textContent = household.name;
-  $("mWho").textContent = (me.email || "Signed in") + " · " + (role === "owner" ? "Owner" : "Helper");
-  $("mInvite").classList.toggle("hidden", role !== "owner");
-  $("mCode").textContent = household.invite_code;
-  $("menuModal").classList.remove("hidden");
-};
-$("mClose").onclick = () => $("menuModal").classList.add("hidden");
-$("menuModal").onclick = e => { if(e.target.id === "menuModal") $("menuModal").classList.add("hidden"); };
-$("mCopy").onclick = async () => {
-  const t = `Join our grocery list: open ${appUrl()}, sign in, choose “Join an existing one” and enter the code ${household.invite_code}`;
-  toast(await copyText(t) ? "Invite copied" : "Couldn't copy", false);
+$("onOut").onclick = signOut;
+$("ownerBtn").onclick = () => setView("fam");
+
+/* ---------- FAMILY (members, permissions, invite) ---------- */
+let members = [], membersAt = 0;
+const canShop = () => role === "owner" || !!(household && household.can_shop);
+const nameOf = id => (members.find(m => m.user_id === id) || {}).display_name || "";
+async function loadMembers(){
+  const { data, error } = await sb.from("members").select("user_id,role,can_shop,display_name").order("joined_at");
+  if(error) return;
+  members = data || []; membersAt = Date.now();
+  const mine = members.find(m => m.user_id === me.id);
+  if(!mine){ location.reload(); return; }
+  household.role = mine.role; household.can_shop = mine.can_shop;
+  role = mine.role === "owner" ? "owner" : "helper";
+}
+async function loadFamily(){ await loadMembers(); renderFamily(); renderCart(); }
+function renderFamily(){
+  const isOwner = role === "owner";
+  let h = `<div class="summary"><b style="font-size:19px">${esc(household.name)}</b>`;
+  if(isOwner) h += `<div class="cat" style="margin:12px 0 2px">Invite code</div>
+    <div style="font-size:26px;font-weight:700;letter-spacing:.08em">${esc(household.invite_code)}</div>
+    <div class="sumbtns" style="margin-top:8px"><button class="secondary" data-fa="copyinv">Copy invite message</button><button class="secondary" data-fa="newcode">New code</button></div>
+    <div class="tip">Anyone with the code joins as a helper (add items only). Make a new code to stop the old one working.</div>`;
+  h += `</div><div class="cat">Members (${members.length})</div>`;
+  members.forEach(m => {
+    const self = m.user_id === me.id;
+    const sub = m.role === "owner" ? "Owner · can tick and reset" : m.can_shop ? "Can tick items and reset" : "Helper · adds items only";
+    h += `<div class="item" style="align-items:center"><div class="body"><div class="name">${esc(m.display_name || "Member")}${self ? " (you)" : ""}</div><div class="brand">${sub}</div></div>`;
+    if(self) h += `<button class="secondary" data-fa="rename">Rename</button>`;
+    else if(isOwner) h += `<div class="sumbtns"><button class="secondary" data-fa="toggle" data-uid="${m.user_id}" data-val="${!m.can_shop}">${m.can_shop ? "Stop ticking" : "Allow ticking"}</button><button class="danger" data-fa="remove" data-uid="${m.user_id}" aria-label="Remove">✕</button></div>`;
+    h += `</div>`;
+  });
+  h += `<button class="secondary full" data-fa="signout" style="margin-top:18px">Sign out (${esc(me.email || "")})</button>`;
+  $("famBody").innerHTML = h;
+}
+$("famBody").onclick = async e => {
+  const b = e.target.closest("[data-fa]"); if(!b) return;
+  const a = b.dataset.fa, uid = b.dataset.uid; let r = null;
+  if(a === "signout"){ signOut(); return; }
+  if(a === "copyinv"){
+    toast(await copyText(`Join our grocery list: open ${appUrl()}, sign in, choose “Join an existing one” and enter the code ${household.invite_code}`) ? "Invite copied" : "Couldn't copy", false); return;
+  }
+  if(a === "newcode"){
+    if(!confirm("Make a new invite code? The old code will stop working.")) return;
+    r = await sb.rpc("new_invite_code"); if(!r.error) household.invite_code = r.data;
+  } else if(a === "rename"){
+    const n = prompt("Your name:", nameOf(me.id)); if(!n || !n.trim()) return;
+    r = await sb.rpc("set_my_name", { p_name: n });
+  } else if(a === "toggle"){
+    r = await sb.rpc("set_member_can_shop", { p_user: uid, p_value: b.dataset.val === "true" });
+  } else if(a === "remove"){
+    if(!confirm(`Remove ${nameOf(uid) || "this person"} from the family?`)) return;
+    r = await sb.rpc("remove_member", { p_user: uid });
+  }
+  if(r && r.error){ toast(r.error.message, true); return; }
+  await loadFamily();
 };
 
 /* ---------- TABS ---------- */
 function setView(v){
   $("viewPick").classList.toggle("hidden", v !== "pick");
   $("viewCart").classList.toggle("hidden", v !== "cart");
+  $("viewFam").classList.toggle("hidden", v !== "fam");
   $("tabPick").classList.toggle("active", v === "pick");
   $("tabCart").classList.toggle("active", v === "cart");
+  $("tabFam").classList.toggle("active", v === "fam");
   window.scrollTo(0, 0);
   if(v === "cart") loadCart();
+  if(v === "fam") loadFamily();
 }
 $("tabPick").onclick = () => setView("pick");
 $("tabCart").onclick = () => setView("cart");
+$("tabFam").onclick = () => setView("fam");
 
 /* ---------- FILTER CHIPS ---------- */
 function renderChips(){
@@ -366,6 +403,7 @@ $("niSave").onclick = async () => {
 
 /* ---------- CART DATA ---------- */
 async function loadCart(){
+  if(!members.length || Date.now() - membersAt > 60000) await loadMembers();
   const { data, error } = await sb.from("cart_items").select("*").eq("archived", false).order("added_at");
   if(error) return;
   cart = data || [];
@@ -393,15 +431,15 @@ function sortedCats(groups){
 function itemHtml(i){
   const b = brandFor(i.name);
   return `<div class="item ${i.purchased ? "done" : ""}">
-    ${role === "owner" ? `<input type="checkbox" data-tick="${i.id}" ${i.purchased ? "checked" : ""}>` : ""}
-    <div class="body"><div class="name">${esc(i.name)}</div>${b ? `<div class="brand">${esc(b)}</div>` : ""}</div>
+    ${canShop() ? `<input type="checkbox" data-tick="${i.id}" ${i.purchased ? "checked" : ""}>` : ""}
+    <div class="body"><div class="name">${esc(i.name)}</div>${b ? `<div class="brand">${esc(b)}</div>` : ""}${members.length > 1 && nameOf(i.added_by) ? `<div class="brand" style="font-size:12px">Added by ${esc(nameOf(i.added_by))}</div>` : ""}</div>
     ${i.purchased ? `<span class="qtybadge">×${i.qty}</span>` :
       `<div class="step"><button data-act="dec" data-id="${i.id}" aria-label="Less">${i.qty <= 1 ? "🗑" : "−"}</button><span>${i.qty}</span><button data-act="inc" data-id="${i.id}" aria-label="More">+</button></div>`}
   </div>`;
 }
 function renderCart(){
   const body = $("cartBody");
-  $("ownerBar").classList.toggle("hidden", !(role === "owner" && cart.length));
+  $("ownerBar").classList.toggle("hidden", !(canShop() && cart.length));
   if(!cart.length){ body.innerHTML = `<div class="empty">The cart is empty.<br>Go to “Pick items” to add some.</div>`; return; }
   const todo = cart.filter(i => !i.purchased), done = cart.filter(i => i.purchased);
   const pct = Math.round(done.length / cart.length * 100);
@@ -489,16 +527,16 @@ let booted = false, booting = false;
 async function boot(){
   if(booting) return; booting = true;
   try{
-    if(SUPABASE_URL.includes("YOUR-PROJECT-REF") || SUPABASE_ANON_KEY.includes("YOUR-ANON")){
+    if(/your-project-ref/i.test(SUPABASE_URL) || /your-anon/i.test(SUPABASE_ANON_KEY) || !/^https:\/\/[a-z0-9]+\.supabase\.co\/?$/i.test(SUPABASE_URL.trim())){
       gate("authView"); $("authMsg").innerHTML = "<b>Setup needed:</b> the Supabase URL and key in index.html have not been filled in."; return;
     }
     const { data: { session } } = await sb.auth.getSession();
     if(!session){ gate("authView"); return; }
     me = session.user;
-    const m = await sb.from("members").select("role, households(id,name,invite_code)").eq("user_id", me.id).maybeSingle();
+    const m = await sb.from("members").select("role, can_shop, households(id,name,invite_code)").eq("user_id", me.id).maybeSingle();
     if(m.error){ gate("authView"); $("authMsg").textContent = "Couldn't load your account: " + m.error.message + " (has multi_household.sql been run?)"; return; }
     if(!m.data){ gate("onboardView"); return; }
-    household = { ...m.data.households, role: m.data.role }; hid = household.id;
+    household = { ...m.data.households, role: m.data.role, can_shop: m.data.can_shop }; hid = household.id;
     const cat = await sb.from("catalogue").select("*").order("id");
     gate("app");
     if(cat.error){ $("pickList").innerHTML = `<div class="empty"><b>Couldn't load the list.</b><br>${esc(cat.error.message)}</div>`; return; }
@@ -507,7 +545,10 @@ async function boot(){
     indexCatalogue(); renderChips(); applyMode(); await loadCart();
     if(!booted){
       booted = true;
-      setInterval(loadCart, 30000);
+      setInterval(loadCart, 60000);
+      let rt = null;
+      sb.channel("cart-live").on("postgres_changes", { event: "*", schema: "public", table: "cart_items" },
+        () => { clearTimeout(rt); rt = setTimeout(loadCart, 300); }).subscribe();
       document.addEventListener("visibilitychange", () => { if(!document.hidden) loadCart(); });
     }
   } finally { booting = false; }
