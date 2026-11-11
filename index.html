@@ -70,6 +70,10 @@
   .sheet .hint{font-size:13px;color:var(--muted);margin-top:3px}
   .sheet .btns{display:flex;gap:10px;margin-top:18px}
   .sheet .btns button{flex:1}
+  .gate{max-width:420px;margin:0 auto;padding:28px 16px}
+  .gate h2{margin:0 0 6px}.gate h3{margin:22px 0 6px;font-size:17px}
+  .gate input{width:100%;padding:12px;font-size:17px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);margin-bottom:8px}
+  .gate button.full{margin-bottom:8px}
   .hidden{display:none}
 </style>
 </head>
@@ -77,10 +81,30 @@
 
 <header>
   <h1>🛒 Grocery List</h1>
-  <div><small id="modeText">Helper</small> <button class="link" id="ownerBtn">Owner</button></div>
+  <div><button class="link hidden" id="ownerBtn">Menu</button></div>
 </header>
 
-<main>
+<section id="authView" class="gate hidden">
+  <h2>🛒 Grocery List</h2>
+  <p class="tip" style="padding-top:0">Sign in to see your family's list.</p>
+  <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
+  <button class="full" id="authSend">Email me a sign-in link</button>
+  <button class="secondary full" id="authGoogle">Continue with Google</button>
+  <p class="tip" id="authMsg"></p>
+</section>
+<section id="onboardView" class="gate hidden">
+  <h2>Welcome 👋</h2>
+  <h3>Start a new family list</h3>
+  <input id="famName" type="text" maxlength="60" placeholder="e.g. The Tans">
+  <button class="full" id="famCreate">Create list (I'm the owner)</button>
+  <h3>Or join an existing one</h3>
+  <input id="famCode" type="text" maxlength="20" placeholder="Invite code" autocapitalize="none" autocomplete="off">
+  <button class="secondary full" id="famJoin">Join with code</button>
+  <p class="tip" id="onMsg"></p>
+  <button class="link" id="onOut" style="color:var(--muted)">Sign out</button>
+</section>
+
+<main id="appMain" class="hidden">
   <section id="viewPick">
     <div class="filters">
       <div class="searchwrap"><input type="search" id="search" placeholder="Search items…" autocomplete="off"><button class="clearbtn hidden" id="clearSearch" aria-label="Clear search">✕</button></div>
@@ -98,11 +122,25 @@
   </section>
 </main>
 
-<nav class="tabs">
+<nav class="tabs hidden" id="appNav">
   <button id="tabPick" class="active">＋ Pick items</button>
   <button id="tabCart">🛒 Cart <span id="cartCount"></span></button>
 </nav>
 <div id="toast" class="toast hidden"></div>
+
+<div id="menuModal" class="modal hidden">
+  <div class="sheet">
+    <h2 id="mName"></h2>
+    <div class="hint" id="mWho"></div>
+    <div id="mInvite">
+      <label>Invite code for your helper or family</label>
+      <div style="font-size:26px;font-weight:700;letter-spacing:.08em" id="mCode"></div>
+      <div class="hint">They sign in, choose “Join an existing one” and type this code.</div>
+      <button class="secondary full" id="mCopy" style="margin-top:10px">Copy invite message</button>
+    </div>
+    <div class="btns"><button class="secondary" id="mClose">Close</button><button class="danger" id="mOut">Sign out</button></div>
+  </div>
+</div>
 
 <div id="newModal" class="modal hidden">
   <div class="sheet">
@@ -126,8 +164,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 /* ============ CONFIG: paste your values from Supabase > Project Settings > API ============ */
-const SUPABASE_URL = "https://yqylyqmqugnjacdtpxdb.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_kmmptkC7uSQGtPj6ItEDmg_vYdogOkr";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 /* ======================================================================================== */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -135,7 +173,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const catLabel = c => (c || "Other").replace(/ \(outside.*\)$/, "");
 
-let role = "helper", pin = null, catalogue = [], categories = [], cart = [];
+let role = "helper", hid = null, me = null, household = null, catalogue = [], categories = [], cart = [];
 let activeCat = "All", showBought = true;
 
 /* ---------- TOAST (with optional Undo) ---------- */
@@ -148,22 +186,50 @@ function toast(text, isErr, undo){
   toast.t = setTimeout(() => t.classList.add("hidden"), undo ? 6000 : isErr ? 5000 : 1800);
 }
 
-/* ---------- OWNER MODE (PIN) ---------- */
-function savedPin(){ try{ return localStorage.getItem("ownerPin"); }catch(e){ return null; } }
-function storePin(p){ try{ p ? localStorage.setItem("ownerPin", p) : localStorage.removeItem("ownerPin"); }catch(e){} }
-function applyMode(){
-  role = pin ? "owner" : "helper";
-  $("modeText").textContent = pin ? "Owner mode" : "Helper";
-  $("ownerBtn").textContent = pin ? "Exit" : "Owner";
-  renderCart();
+/* ---------- SIGN-IN, FAMILY, MENU ---------- */
+const appUrl = () => location.href.split("#")[0].split("?")[0];
+function gate(name){
+  ["authView","onboardView","appMain","appNav","ownerBtn"].forEach(id => $(id).classList.toggle("hidden", id !== name && !(name === "app" && ["appMain","appNav","ownerBtn"].includes(id))));
 }
-$("ownerBtn").onclick = async () => {
-  if(pin){ pin = null; storePin(null); applyMode(); return; }
-  const p = prompt("Owner PIN:");
-  if(!p) return;
-  const { data, error } = await sb.rpc("check_owner_pin", { p_pin: p });
-  if(error || !data){ alert("Wrong PIN."); return; }
-  pin = p; storePin(p); applyMode();
+function applyMode(){ role = household && household.role === "owner" ? "owner" : "helper"; renderCart(); }
+$("authSend").onclick = async () => {
+  const email = $("authEmail").value.trim(); if(!email){ $("authMsg").textContent = "Enter your email first."; return; }
+  $("authSend").disabled = true;
+  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: appUrl() } });
+  $("authSend").disabled = false;
+  $("authMsg").textContent = error ? error.message : "Check your email and tap the link (look in spam too).";
+};
+$("authGoogle").onclick = async () => {
+  const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: appUrl() } });
+  if(error) $("authMsg").textContent = error.message;
+};
+$("famCreate").onclick = async () => {
+  const name = $("famName").value.trim(); if(!name){ $("onMsg").textContent = "Give your list a name."; return; }
+  $("onMsg").textContent = "Setting up…";
+  const { error } = await sb.rpc("create_household", { p_name: name });
+  if(error){ $("onMsg").textContent = error.message; return; }
+  boot();
+};
+$("famJoin").onclick = async () => {
+  const code = $("famCode").value.trim(); if(!code){ $("onMsg").textContent = "Enter the invite code."; return; }
+  const { error } = await sb.rpc("join_household", { p_code: code });
+  if(error){ $("onMsg").textContent = error.message; return; }
+  boot();
+};
+const signOut = async () => { await sb.auth.signOut(); location.reload(); };
+$("onOut").onclick = signOut; $("mOut").onclick = signOut;
+$("ownerBtn").onclick = () => {
+  $("mName").textContent = household.name;
+  $("mWho").textContent = (me.email || "Signed in") + " · " + (role === "owner" ? "Owner" : "Helper");
+  $("mInvite").classList.toggle("hidden", role !== "owner");
+  $("mCode").textContent = household.invite_code;
+  $("menuModal").classList.remove("hidden");
+};
+$("mClose").onclick = () => $("menuModal").classList.add("hidden");
+$("menuModal").onclick = e => { if(e.target.id === "menuModal") $("menuModal").classList.add("hidden"); };
+$("mCopy").onclick = async () => {
+  const t = `Join our grocery list: open ${appUrl()}, sign in, choose “Join an existing one” and enter the code ${household.invite_code}`;
+  toast(await copyText(t) ? "Invite copied" : "Couldn't copy", false);
 };
 
 /* ---------- TABS ---------- */
@@ -288,10 +354,10 @@ $("niSave").onclick = async () => {
   const brand = $("niBrand").value.trim() || null, size = $("niSize").value.trim() || null;
   const rank = Math.max(0, ...catalogue.filter(c => c.category === cat).map(c => c.rank_in_category || 0)) + 1;
   $("niSave").disabled = true;
-  const ins = await sb.from("catalogue").insert({ category: cat, name, brands: brand, pack_sizes: size, rank_in_category: rank }).select().single();
+  const ins = await sb.from("catalogue").insert({ household_id: hid, category: cat, name, brands: brand, pack_sizes: size, rank_in_category: rank }).select().single();
   if(ins.error){ toast("Couldn't save to the catalogue: " + ins.error.message, true); $("niSave").disabled = false; return; }
   catalogue.push(ins.data); indexCatalogue(); renderChips();
-  const r = await sb.from("cart_items").insert({ name, category: cat, qty: 1 }).select("id").single();
+  const r = await sb.from("cart_items").insert({ household_id: hid, name, category: cat, qty: 1 }).select("id").single();
   closeNewItem(); $("search").value = "";
   if(r.error) toast("Saved to the catalogue, but couldn't add to the cart: " + r.error.message, true);
   else { const newId = r.data.id; toast("Added " + name, false, async () => { await sb.from("cart_items").delete().eq("id", newId); loadCart(); }); }
@@ -352,7 +418,7 @@ function renderCart(){
   }
   body.innerHTML = html;
   body.querySelectorAll("[data-tick]").forEach(cb => cb.onchange = async () => {
-    const { error } = await sb.rpc("owner_set_purchased", { p_pin: pin, p_id: Number(cb.dataset.tick), p_value: cb.checked });
+    const { error } = await sb.rpc("owner_set_purchased", { p_id: Number(cb.dataset.tick), p_value: cb.checked });
     if(error) toast(error.message, true);
     loadCart();
   });
@@ -370,7 +436,7 @@ async function removeRow(row){
   const { error } = await sb.from("cart_items").delete().eq("id", row.id);
   if(error){ toast(error.message, true); return; }
   toast(`Removed ${row.name}`, false, async () => {
-    await sb.from("cart_items").insert({ name: row.name, category: row.category, qty: row.qty });
+    await sb.from("cart_items").insert({ household_id: hid, name: row.name, category: row.category, qty: row.qty });
     loadCart();
   });
 }
@@ -389,7 +455,7 @@ async function act(e){
   let error = null;
   if(a === "add"){
     const name = b.dataset.name;
-    const r = await sb.from("cart_items").insert({ name, category: b.dataset.cat || null, qty: 1 }).select("id").single();
+    const r = await sb.from("cart_items").insert({ household_id: hid, name, category: b.dataset.cat || null, qty: 1 }).select("id").single();
     error = r.error;
     if(!error){
       const newId = r.data.id;
@@ -412,34 +478,42 @@ $("resetBtn").onclick = async () => {
   if(!ticked){ toast("Tick off some items first"); return; }
   const msg = `Reset ${ticked} ticked item${ticked === 1 ? "" : "s"}?` + (left ? `\n${left} item${left === 1 ? "" : "s"} not ticked will stay in the cart.` : "");
   if(!confirm(msg)) return;
-  const { data, error } = await sb.rpc("owner_reset_cart", { p_pin: pin });
+  const { data, error } = await sb.rpc("owner_reset_cart");
   if(error){ toast(error.message, true); return; }
   toast(`Cart reset: ${data ?? ""} item${data === 1 ? "" : "s"} cleared`);
   loadCart();
 };
 
 /* ---------- START ---------- */
-(async function start(){
-  if(SUPABASE_URL.includes("YOUR-PROJECT-REF") || SUPABASE_ANON_KEY.includes("YOUR-ANON")){
-    $("pickList").innerHTML = `<div class="empty"><b>Setup needed:</b> the Supabase URL and key in index.html have not been filled in.</div>`; return;
-  }
-  const cat = await sb.from("catalogue").select("*").order("id");
-  if(cat.error){
-    $("pickList").innerHTML = `<div class="empty"><b>Couldn't load the list.</b><br>${esc(cat.error.message)}<br><small>Check the URL and key in index.html, and that setup.sql was run.</small></div>`; return;
-  }
-  catalogue = cat.data || [];
-  if(!catalogue.length){
-    $("pickList").innerHTML = `<div class="empty"><b>The list is empty.</b><br>Connected to Supabase, but the catalogue table has no rows (or the read permission is missing). Re-run setup.sql.</div>`; return;
-  }
-  indexCatalogue();
-  const sp = savedPin();
-  if(sp){ const { data } = await sb.rpc("check_owner_pin", { p_pin: sp }); if(data) pin = sp; else storePin(null); }
-  renderChips();
-  applyMode();
-  await loadCart();
-  setInterval(loadCart, 30000);
-  document.addEventListener("visibilitychange", () => { if(!document.hidden) loadCart(); });
-})();
+let booted = false, booting = false;
+async function boot(){
+  if(booting) return; booting = true;
+  try{
+    if(SUPABASE_URL.includes("YOUR-PROJECT-REF") || SUPABASE_ANON_KEY.includes("YOUR-ANON")){
+      gate("authView"); $("authMsg").innerHTML = "<b>Setup needed:</b> the Supabase URL and key in index.html have not been filled in."; return;
+    }
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session){ gate("authView"); return; }
+    me = session.user;
+    const m = await sb.from("members").select("role, households(id,name,invite_code)").eq("user_id", me.id).maybeSingle();
+    if(m.error){ gate("authView"); $("authMsg").textContent = "Couldn't load your account: " + m.error.message + " (has multi_household.sql been run?)"; return; }
+    if(!m.data){ gate("onboardView"); return; }
+    household = { ...m.data.households, role: m.data.role }; hid = household.id;
+    const cat = await sb.from("catalogue").select("*").order("id");
+    gate("app");
+    if(cat.error){ $("pickList").innerHTML = `<div class="empty"><b>Couldn't load the list.</b><br>${esc(cat.error.message)}</div>`; return; }
+    catalogue = cat.data || [];
+    if(!catalogue.length){ $("pickList").innerHTML = `<div class="empty"><b>The list is empty.</b><br>Your family's catalogue has no items yet.</div>`; return; }
+    indexCatalogue(); renderChips(); applyMode(); await loadCart();
+    if(!booted){
+      booted = true;
+      setInterval(loadCart, 30000);
+      document.addEventListener("visibilitychange", () => { if(!document.hidden) loadCart(); });
+    }
+  } finally { booting = false; }
+}
+sb.auth.onAuthStateChange(ev => { if(ev === "SIGNED_OUT") location.reload(); else if(ev === "SIGNED_IN" && !hid) boot(); });
+boot();
 </script>
 </body>
 </html>
