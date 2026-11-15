@@ -223,6 +223,24 @@
   .btnrow{display:flex;gap:8px;flex-wrap:wrap}
   .back{display:inline-flex;align-items:center;gap:2px;margin:10px 0 0 -8px}
 
+  /* top actions: New item + Edit list sit together in the sticky bar */
+  .actions{display:flex;gap:8px;flex:none}
+  .toolbtn{width:46px;height:46px;padding:0;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--surface);color:var(--ink);border:1px solid var(--line2)}
+  .toolbtn.on{background:var(--sun-bg);color:var(--sun-ink);border-color:var(--sun-line)}
+  .sortbtn{display:inline-flex;align-items:center;gap:6px}
+  #sortOpts .choice{padding-right:56px}
+  .choice{position:relative}
+  .choice.on{border-color:var(--brand);background:var(--tint)}
+  .choice.on::after{content:"";position:absolute;right:18px;top:50%;width:24px;height:24px;margin-top:-12px;border-radius:50%;background:var(--brand) var(--check) center/16px no-repeat}
+  /* add to home screen guide */
+  .seg{display:flex;background:var(--tint);border-radius:12px;padding:4px;gap:4px;margin:16px 0 16px}
+  .seg button{flex:1;background:transparent;color:var(--brand-text);padding:9px 10px;border-radius:9px;border:1.5px solid transparent}
+  .seg button[aria-selected="true"]{background:var(--surface);color:var(--ink);border-color:var(--brand)}
+  .a2hs{display:flex;gap:16px;align-items:flex-start}
+  .a2hs .shot{flex:none;width:min(164px,40%);height:auto;aspect-ratio:540/1171;border-radius:18px;border:1px solid var(--line2);background:var(--paper)}
+  .a2hs ol{list-style:none;counter-reset:s;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;min-width:0;flex:1}
+  .a2hs li{counter-increment:s;display:flex;gap:10px;font-size:15.5px;line-height:1.4}
+  .a2hs li::before{content:counter(s);flex:none;width:24px;height:24px;border-radius:50%;background:var(--tint);color:var(--brand-text);font-weight:700;font-size:13px;display:grid;place-items:center;margin-top:1px}
   /* list tools, edit mode, stars */
   .tools{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:6px 0 0}
   .editbar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--sun-bg);color:var(--sun-ink);border:1px solid var(--sun-line);border-radius:14px;padding:10px 12px;margin-top:12px;font-size:14px}
@@ -298,6 +316,7 @@
     <button class="mi" data-mi="fam" role="menuitem"><span data-ico="users"></span>Family and members</button>
     <button class="mi" data-mi="aisle" id="miAisle" role="menuitem"><span data-ico="route"></span>Aisle order</button>
     <button class="mi" data-mi="tour" role="menuitem"><span data-ico="play"></span>Take the tour</button>
+    <button class="mi" data-mi="a2hs" role="menuitem"><span data-ico="addhome"></span>Add to Home Screen</button>
     <button class="mi" data-mi="about" role="menuitem"><span data-ico="info"></span>About and feedback</button>
     <button class="mi" data-mi="out" role="menuitem"><span data-ico="logout"></span>Sign out</button>
   </div>
@@ -412,7 +431,10 @@
           <input type="search" id="search" placeholder="Search items" autocomplete="off">
           <button class="clearbtn hidden" id="clearSearch" aria-label="Clear search" data-ico="close" data-size="20"></button>
         </div>
-        <button class="newbtn" data-act="newitemform"><span data-ico="plus" data-size="18"></span><span>New<span class="wide"> item</span></span></button>
+        <div class="actions">
+          <button class="newbtn" data-act="newitemform"><span data-ico="plus" data-size="18"></span><span>New<span class="wide"> item</span></span></button>
+          <button class="toolbtn" id="editToggle" data-act="toggleedit" aria-label="Edit list" aria-pressed="false" data-ico="pencil" data-size="20"></button>
+        </div>
       </div>
       <div class="chiprow">
         <div class="chips" id="chips"></div>
@@ -486,6 +508,45 @@
   </div>
 </div>
 
+<div id="sortModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="sortTitle">
+  <div class="sheet">
+    <h2 id="sortTitle">Sort items</h2>
+    <div class="hint">Sorts the items inside each category. Categories stay in your aisle order. This choice is just for you.</div>
+    <div id="sortOpts" role="radiogroup" aria-labelledby="sortTitle" style="margin-top:16px"></div>
+    <p class="tip" style="text-align:center"><button class="link" id="sortCancel">Cancel</button></p>
+  </div>
+</div>
+
+<div id="a2hsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="a2hsTitle">
+  <div class="sheet">
+    <h2 id="a2hsTitle">Add to your Home Screen</h2>
+    <div class="hint" id="a2hsHint"></div>
+    <div class="seg" role="tablist" aria-label="Type of phone">
+      <button role="tab" id="segIos" data-os="ios" aria-selected="true">iPhone</button>
+      <button role="tab" id="segAnd" data-os="android" aria-selected="false">Android</button>
+    </div>
+    <div id="a2hsIos" class="a2hs">
+      <img class="shot" id="a2hsGifIos" width="540" height="1171" alt="Animated walkthrough on an iPhone: tap the menu button, tap Share, tap View More, tap Add to Home Screen, then tap Add." decoding="async">
+      <ol>
+        <li><span>Tap the <b>menu</b> button next to the web address (<b>≡</b> or <b>⋯</b>).</span></li>
+        <li><span>Tap <b>Share</b>.</span></li>
+        <li><span>Tap <b>View More</b>, then <b>Add to Home Screen</b>.</span></li>
+        <li><span>Tap <b>Add</b>.</span></li>
+      </ol>
+    </div>
+    <div id="a2hsAnd" class="a2hs hidden">
+      <img class="shot" id="a2hsGifAnd" width="540" height="1171" alt="Animated walkthrough on an Android phone." decoding="async">
+      <ol>
+        <li><span>Tap the <b>⋮</b> menu at the top right of Chrome.</span></li>
+        <li><span>Tap <b>Add to Home screen</b> (or <b>Install app</b>).</span></li>
+        <li><span>Tap <b>Install</b> or <b>Add</b>.</span></li>
+      </ol>
+    </div>
+    <p class="tip">Use Safari on iPhone, or Chrome on Android. If you opened the link from WhatsApp or another app, open it in your browser first.</p>
+    <div class="btns"><button id="a2hsDone">Got it</button></div>
+  </div>
+</div>
+
 <div id="dlg" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
   <div class="sheet">
     <h2 id="dlgTitle"></h2>
@@ -549,7 +610,9 @@ const ICONS = {
   star: stroke(STAR),
   starOn: stroke(STAR, 1.6, "currentColor"),
   info: stroke(`<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6h.01"/>`),
-  play: stroke(`<circle cx="12" cy="12" r="9"/><path d="M10.2 8.6l5 3.4-5 3.4z"/>`)
+  play: stroke(`<circle cx="12" cy="12" r="9"/><path d="M10.2 8.6l5 3.4-5 3.4z"/>`),
+  sort: stroke(`<path d="M8 5v14M5 8l3-3 3 3M16 19V5M13 16l3 3 3-3"/>`),
+  addhome: stroke(`<rect x="4" y="4" width="16" height="16" rx="4.5"/><path d="M12 8.5v7M8.5 12h7"/>`)
 };
 const ico = (n, size) => ICONS[n](size);
 document.querySelectorAll("[data-ico]").forEach(el => { el.innerHTML = ico(el.dataset.ico, el.dataset.size ? Number(el.dataset.size) : undefined); });
@@ -564,7 +627,7 @@ let role = "helper", hid = null, me = null, household = null, catalogue = [], ca
 let activeCat = "All", showBought = true, curView = "pick", prevView = "pick";
 let aisleOrder = [], aisleReady = false;
 let shopHist = [], histAt = 0, lowItems = [], freqSet = new Set(), catAt = 0;
-let editMode = false, showBrands = false;
+let editMode = false, showBrands = false, itemSort = "list", buyCounts = {}, pendingA2hs = false;
 let popName = "", bounceId = 0, popStarId = "", editingId = null;
 const later = (fn, ms = 900) => setTimeout(fn, ms);
 let pinReady = false, familyPin = "", famNewSince = 0, joinFound = null, pinTimer = null;
@@ -701,7 +764,7 @@ $("joinGo").onclick = async () => {
   const { error } = await sb.rpc("join_family", { p_pin: joinFound.pin, p_name: joinFound.name });
   $("joinGo").disabled = false;
   if(error){ $("joinMsg").textContent = needsSql(error) ? SQL_MSG_JOIN : error.message; return; }
-  clearPendingJoin(); boot();
+  clearPendingJoin(); pendingA2hs = true; boot();
 };
 $("createGo").onclick = async () => {
   const mine = $("createMyName").value.trim(), name = $("createName").value.trim(), pin = digits($("createPin").value);
@@ -716,7 +779,7 @@ $("createGo").onclick = async () => {
 };
 $("shareSend").onclick = () => shareInvite();
 $("shareCopy").onclick = async () => toast(await copyText(inviteText()) ? "Message copied" : "Couldn't copy", false);
-$("shareDone").onclick = () => boot();
+$("shareDone").onclick = () => { pendingA2hs = true; boot(); };
 [["authEmail","authSend"],["authCode","authVerify"],["joinPin","joinFind"],["createPin","createGo"]].forEach(([i, b]) =>
   $(i).addEventListener("keydown", e => { if(e.key === "Enter") $(b).click(); }));
 const signOut = async () => { await sb.auth.signOut(); location.reload(); };
@@ -745,6 +808,7 @@ $("menu").onclick = e => {
   if(b.dataset.mi === "fam") setView("fam");
   else if(b.dataset.mi === "aisle") openAisle();
   else if(b.dataset.mi === "tour") openTour();
+  else if(b.dataset.mi === "a2hs") openA2hs();
   else if(b.dataset.mi === "about") setView("about");
   else if(b.dataset.mi === "out") signOut();
 };
@@ -873,7 +937,14 @@ function catRank(c){
   const j = categories.indexOf(c); return 1000 + (j >= 0 ? j : 500);
 }
 const aisleCats = () => categories.slice().sort((a, b) => catRank(a) - catRank(b));
-const sortAisle = rows => rows.slice().sort((a, b) => catRank(a.category) - catRank(b.category) || (a.rank_in_category || 0) - (b.rank_in_category || 0));
+const nameCmp = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true });
+const boughtN = c => buyCounts[c.name.toLowerCase()] || 0;
+function itemCmp(a, b){
+  if(itemSort === "az") return nameCmp(a, b);
+  if(itemSort === "freq") return boughtN(b) - boughtN(a) || nameCmp(a, b);
+  return (a.rank_in_category || 0) - (b.rank_in_category || 0);
+}
+const sortAisle = rows => rows.slice().sort((a, b) => catRank(a.category) - catRank(b.category) || itemCmp(a, b));
 function sortedCats(groups){ return Object.keys(groups).sort((a, b) => catRank(a) - catRank(b)); }
 async function loadAisle(){
   if(!hid) return;
@@ -977,6 +1048,7 @@ function computeFrequent(){
   const bump = n => { const k = String(n).toLowerCase(); counts[k] = (counts[k] || 0) + 1; };
   shopHist.forEach(r => bump(r.name));
   cart.forEach(i => { if(i.purchased) bump(i.name); });
+  buyCounts = counts;
   const byCat = {};
   catalogue.forEach(c => (byCat[c.category] ||= []).push(c));
   const set = new Set();
@@ -1020,9 +1092,10 @@ function rowHtml(c, ex, custom){
 function renderPick(){
   const raw = $("search").value.trim(), term = raw.toLowerCase();
   $("clearSearch").classList.toggle("hidden", !$("search").value);
-  $("pickTools").innerHTML = editMode
-    ? `<div class="editbar"><span>Tap the pencil to change an item, or the bin to remove it.</span><button class="sm" data-act="doneedit">Done</button></div>`
-    : `<div class="tools"><button class="ghost" data-act="edit">Edit list</button></div>`;
+  const et = $("editToggle");
+  et.classList.toggle("on", editMode); et.setAttribute("aria-pressed", String(editMode)); et.innerHTML = ico(editMode ? "check" : "pencil", 20);
+  $("pickTools").innerHTML = `<div class="tools"><button class="ghost sortbtn" data-act="sort" aria-haspopup="dialog">${ico("sort", 18)}Sort: ${esc(sortLabel())}</button></div>`
+    + (editMode ? `<div class="editbar"><span>Tap the pencil on an item to change it, or the bin to remove it.</span><button class="sm" data-act="doneedit">Done</button></div>` : "");
   const inCart = cartMap();
   let rows, headers = true, html = "", buf = "", last = null;
   if(activeCat === "__freq") rows = catalogue.filter(c => freqSet.has(c.id));
@@ -1043,6 +1116,38 @@ function renderPick(){
   if(!rows.length && !raw) html = `<div class="empty">${catalogue.length ? "No items here yet." : "Your list is empty. Tap New item to add your first item."}</div>`;
   $("pickList").innerHTML = html;
 }
+
+/* ---------- SORT ITEMS INSIDE EACH CATEGORY (a personal choice, remembered per person) ---------- */
+const SORTS = [
+  ["list", "List order", "The order items were set up and added."],
+  ["az", "A to Z", "Alphabetical inside each category."],
+  ["freq", "Most bought", "What you buy most comes first. It learns as you shop."]
+];
+const sortLabel = () => (SORTS.find(x => x[0] === itemSort) || SORTS[0])[1];
+const sortKey = () => "itemSort:" + (me && me.id);
+function loadSort(){
+  let v = null;
+  try{ v = localStorage.getItem(sortKey()); }catch(_){}
+  if(!v && me && me.user_metadata) v = me.user_metadata.item_sort;
+  itemSort = SORTS.some(x => x[0] === v) ? v : "list";
+}
+function saveSort(v){
+  itemSort = v;
+  try{ localStorage.setItem(sortKey(), v); }catch(_){}
+  try{ Promise.resolve(sb.auth.updateUser({ data: { item_sort: v } })).catch(() => {}); }catch(_){}   // so it follows them to another phone
+}
+function openSort(){
+  $("sortOpts").innerHTML = SORTS.map(([v, t, d]) =>
+    `<button class="choice${v === itemSort ? " on" : ""}" role="radio" aria-checked="${v === itemSort}" data-sort="${v}"><b>${t}</b><span>${d}</span></button>`).join("");
+  $("sortModal").classList.remove("hidden");
+}
+const closeSort = () => $("sortModal").classList.add("hidden");
+$("sortOpts").onclick = e => {
+  const b = e.target.closest("[data-sort]"); if(!b) return;
+  saveSort(b.dataset.sort); closeSort(); renderPick(); toast("Sorted: " + sortLabel());
+};
+$("sortCancel").onclick = closeSort;
+$("sortModal").onclick = e => { if(e.target.id === "sortModal") closeSort(); };
 
 /* ---------- REMOVE AN ITEM FROM THE LIST ---------- */
 async function removeCatalogueItem(cid){
@@ -1284,6 +1389,8 @@ async function act(e){
   // actions that don't touch the cart table
   if(a === "newitem"){ openNewItem(b.dataset.name); return; }
   if(a === "newitemform"){ openNewItem("", activeCat !== "All" && activeCat !== "__freq" ? activeCat : null); return; }
+  if(a === "toggleedit"){ editMode = !editMode; renderPick(); return; }
+  if(a === "sort"){ openSort(); return; }
   if(a === "edit"){ editMode = true; renderPick(); return; }
   if(a === "doneedit"){ editMode = false; renderPick(); return; }
   if(a === "rm"){ await removeCatalogueItem(b.dataset.cid); return; }
@@ -1337,6 +1444,38 @@ $("resetBtn").onclick = async () => {
   await loadCart(); loadHistory();
 };
 
+/* ---------- ADD TO HOME SCREEN: shown to new families and new members, and from the menu ---------- */
+const A2HS_GIF = { ios: "add-to-home-screen.gif", android: "add-to-home-screen-android.gif" };   // drop an Android GIF with this name next to index.html and it appears
+const isStandalone = () => { try{ return window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches; }catch(_){ return false; } };
+let a2hsAfter = null;
+function setA2hsOs(os){
+  const ios = os === "ios";
+  $("segIos").setAttribute("aria-selected", String(ios)); $("segAnd").setAttribute("aria-selected", String(!ios));
+  $("a2hsIos").classList.toggle("hidden", !ios); $("a2hsAnd").classList.toggle("hidden", ios);
+  const img = $(ios ? "a2hsGifIos" : "a2hsGifAnd"), other = $(ios ? "a2hsGifAnd" : "a2hsGifIos");
+  other.removeAttribute("src");                                  // stop the hidden one playing
+  img.classList.remove("hidden"); img.onerror = () => img.classList.add("hidden");
+  img.src = A2HS_GIF[os];                                        // loaded only now, and it restarts from the first frame
+}
+function openA2hs(after){
+  a2hsAfter = after || null;
+  $("a2hsHint").textContent = isStandalone()
+    ? `You are already using ${APP_NAME} from your Home Screen. This is here for another phone, or to show someone else.`
+    : `Open ${APP_NAME} in one tap, like any other app on your phone.`;
+  setA2hsOs(/android/i.test(navigator.userAgent) ? "android" : "ios");
+  $("a2hsModal").classList.remove("hidden");
+}
+function closeA2hs(){
+  $("a2hsModal").classList.add("hidden");
+  $("a2hsGifIos").removeAttribute("src"); $("a2hsGifAnd").removeAttribute("src");
+  const f = a2hsAfter; a2hsAfter = null; if(f) f();
+}
+$("segIos").onclick = () => setA2hsOs("ios");
+$("segAnd").onclick = () => setA2hsOs("android");
+$("a2hsDone").onclick = closeA2hs;
+$("a2hsModal").onclick = e => { if(e.target.id === "a2hsModal") closeA2hs(); };
+document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("a2hsModal").classList.contains("hidden")) closeA2hs(); });
+
 /* ---------- ABOUT ---------- */
 function sendMail(){ location.href = "mailto:" + ["support", "listgroceries.app"].join("@") + "?subject=" + encodeURIComponent("Suggestion for " + APP_NAME); }
 $("viewAbout").onclick = e => {
@@ -1366,8 +1505,8 @@ function coachSteps(){
   return [
     { view: "pick", target: q('#pickList [data-act="add"]'), fallback: q(".newbtn"), title: "Add what you need",
       text: `Tap <b>Add</b> next to an item and it goes into the cart.` },
-    { view: "pick", target: q(".newbtn"), title: "Not on the list?",
-      text: `Tap <b>New item</b> to add your own. <b>Edit list</b>, just below the categories, lets you change or remove items.` },
+    { view: "pick", target: q(".actions"), title: "Not on the list?",
+      text: `Tap <b>New item</b> to add your own. The <b>pencil</b> next to it lets you change or remove items. <b>Sort</b>, just below, puts each category in A to Z or most bought order.` },
     { view: "pick", target: q('.chip[data-cat="__freq"]'), title: "The Frequent tab",
       text: `Frequent saves you scrolling. It holds two kinds of items: the ones you buy most often in each category, which updates by itself as you shop, and the ones you have starred ${star}.${shop ? " Tap the star next to any item to add it yourself." : " The owner, and anyone allowed to shop, can star items."}` },
     { view: "cart", target: q("#cartBody .step"), fallback: q("#tabCart"), art: A.cart, title: "Your cart",
@@ -1378,7 +1517,7 @@ function coachSteps(){
       : { view: "cart", target: q("#tabCart"), art: A.tick, alwaysArt: true, title: "Ticking and resetting",
           text: `Whoever does the shopping ticks items off as they buy them, then taps <b>Reset cart</b> to clear what has been bought. Right now that is the owner and anyone they allow. Ask the owner to switch it on for you in <b>Family and members</b>.` },
     { view: "pick", target: q("#menuBtn"), title: "More in the menu",
-      text: `Tap here for <b>Family and members</b>${owner ? " (your Family PIN is there)" : ""}${shop ? ", <b>Aisle order</b>" : ""} and <b>About and feedback</b>. You can replay this tour from there any time.` }
+      text: `Tap here for <b>Family and members</b>${owner ? " (your Family PIN is there)" : ""}${shop ? ", <b>Aisle order</b>" : ""}, <b>Add to Home Screen</b> and <b>About and feedback</b>. You can replay this tour from there any time.` }
   ];
 }
 function placeCoach(el){
@@ -1455,6 +1594,7 @@ async function boot(){
     if(!session){ gate("authView"); return; }
     me = session.user;
     try{ showBrands = localStorage.getItem("showBrands:" + me.id) === "1"; }catch(_){}
+    loadSort();
     const getMembership = () => sb.from("members").select("role, can_shop, households(id,name,invite_code)").eq("user_id", me.id).maybeSingle();
     let m = await getMembership();
     if(m.error){ gate("authView"); authMsg("Couldn't load your account: " + m.error.message + " (has multi_household.sql been run?)"); return; }
@@ -1471,7 +1611,9 @@ async function boot(){
     if(cat.error){ $("pickList").innerHTML = `<div class="empty"><b>Couldn't load the list</b>${esc(cat.error.message)}</div>`; return; }
     catalogue = cat.data || []; catAt = Date.now();
     indexCatalogue(); await loadAisle(); computeFrequent(); renderChips(); applyMode(); await loadCart(); loadHistory();
-    if(!tourDone()) openTour();
+    const afterGuide = () => { if(!tourDone()) openTour(); };
+    if(pendingA2hs){ pendingA2hs = false; if(isStandalone()) afterGuide(); else openA2hs(afterGuide); }   // new family or new member: home screen guide first, then the tour
+    else afterGuide();
     if(!booted){
       booted = true;
       setInterval(loadCart, 60000);
